@@ -1,0 +1,5 @@
+__pycache__
+.env
+economy.json
+server.json
+vclog_data.json
