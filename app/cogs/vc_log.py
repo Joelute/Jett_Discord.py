@@ -6,8 +6,9 @@ import math
 from datetime import datetime
 import discord_components
 from discord_components import Button, ButtonStyle
-
+import database
 # Pepega Coding Adventure: Volume 1
+
 
 class vc_log(commands.Cog):
 
@@ -17,23 +18,23 @@ class vc_log(commands.Cog):
 
     self.board = {}
      
-
+    self.cursor, self.conn = database.get_cursor()
 
   @commands.command(name="vclog")
   async def vclog(self, ctx):
-    with open("vclog_data.json", "r") as f:
+      
+      self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(ctx.guild.id),))
+      
+      filter_data = self.cursor.fetchall()
+      
+      pages = math.ceil(len(filter_data)/10)
 
-      data = json.load(f)
-      filter_data = len([i for i in reversed(data) if str(data[i]["server_id"]) == str(ctx.guild.id)])
-      
-      pages = math.ceil(filter_data/10)
-      
       if pages > 0:
         pages -= 1
       
       self.board[ctx.author.id] = {"Message": None, "Page": 0, "Pages": pages, "server": ctx.guild.id}
       
-      self.board[ctx.author.id]["Message"] = await ctx.send(embed=await self.board_embed(ctx.author, data), components = 
+      self.board[ctx.author.id]["Message"] = await ctx.send(embed=await self.board_embed(ctx.author, filter_data), components = 
     [[
       Button(style = ButtonStyle.blue, label = "⬆", custom_id="up"),
       Button(style = ButtonStyle.blue, label = "⬇", custom_id = "down"), 
@@ -47,20 +48,19 @@ class vc_log(commands.Cog):
     start_at = self.board[user.id]["Page"] * 10
     counter = 0
     end_at = start_at + 10
-    
     for i in reversed(data):
-      if str(data[i]["server_id"]) != str(self.board[user.id]["server"]):
-        continue
+      
+      
       if counter >= start_at:
-        get_time = str(data[i]["time"])
+        get_time = str(i["timestamp"])
         joined_time.append(f"<t:{get_time}>")
 
-        get_user = str(data[i]["user_id"])
+        get_user = str(i["user_id"])
         joined_user.append(f"<@{get_user}>")
 
-        channel_name= str(data[i]["channel"])
+        channel_name= str(i["channel"])
 
-        activity.append(data[i]["action"] + " " + channel_name)
+        activity.append(i["action"] + " " + channel_name)
       
       counter += 1
 
@@ -101,46 +101,46 @@ class vc_log(commands.Cog):
     
     # Join a call from not being in a call previously
     if before.channel == None and after.channel != None:
-      with open("vclog_data.json", "r") as f:
-        data = json.load(f)
-        slot = (len(data) + 1)
+
         time = math.floor(int(datetime.utcnow().timestamp()))  
         server = (await self.bot.fetch_channel(after.channel.id)).guild.id
-        name = str(after.channel.name)
-        if len(name) > 21:
-          name = name[:20] + "..."    
-        data[str(slot)] = {"time": str(time), "user_id": member.id, "channel": name, "action": "Joined", "server_id":server}
+        channel_name = str(after.channel.name)
+        if len(channel_name) > 21:
+          channel_name = channel_name[:20] + "..."    
+        action = "Joined"
 
     # Leaving a call
     elif before.channel != None and after.channel == None:
-      with open("vclog_data.json", "r") as f:
-        data = json.load(f)
-        slot = (len(data) + 1)
+
         time = math.floor(int(datetime.utcnow().timestamp()))     
         server = (await self.bot.fetch_channel(before.channel.id)).guild.id
-        name = str(before.channel.name)
-        if len(name) > 21:
-          name = name[:20] + "..." 
-        data[str(slot)] = {"time": str(time), "user_id": member.id, "channel": name, "action": "Left", "server_id":server}
+        channel_name = str(before.channel.name)
+        if len(channel_name) > 21:
+          channel_name = channel_name[:20] + "..." 
+        action = "Left"
 
     # Joining a call from another call
     elif before.channel != None and after.channel != None and before.channel.id != after.channel.id:
-      with open("vclog_data.json", "r") as f:
-        data = json.load(f)
-        slot = (len(data) + 1)
+
         time = math.floor(int(datetime.utcnow().timestamp()))
         server = (await self.bot.fetch_channel(after.channel.id)).guild.id
-        name = str(after.channel.name)
-        if len(name) > 16:
-          name = name[:15] + "..."  
-        data[str(slot)] = {"time": str(time), "user_id": member.id, "channel": name, "action": "Moved to", "server_id":server}
-
+        channel_name = str(after.channel.name)
+        if len(channel_name) > 16:
+          channel_name = channel_name[:15] + "..."  
+        action = "Moved to"
+    
     else:
       return
+
+    #Possible ERROR: CURRENT TRANSACTION IS ABORTED, COMMANDS IGNORED UNTIL END OF TRANSACTION BLOCK
+    try:
+      self.cursor.execute("""INSERT INTO vclog (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s) RETURNING *""", (time, member.id, channel_name, action, server))
+      context = self.cursor.fetchone()
+      self.conn.commit()   
+    except:
+      self.cursor.execute("""rollback;""")
+      print("An Error has occured")
     
-    with open("vclog_data.json", "w") as f:
-      json.dump(data, f, indent = 4)
-      print("Recorded Activity")    
 
 
   @commands.Cog.listener(name='on_button_click')
@@ -154,18 +154,18 @@ class vc_log(commands.Cog):
           return
     
         self.board[interaction.user.id]["Page"] -= 1
-        with open("vclog_data.json", "r") as f:
-          data = json.load(f)
-          await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, data))
+        self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+        filter_data = self.cursor.fetchall()
+        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
 
       elif interaction.component.id == 'down':
         if self.board[interaction.user.id]["Page"] >= self.board[interaction.user.id]["Pages"]:
           return
     
         self.board[interaction.user.id]["Page"] += 1
-        with open("vclog_data.json", "r") as f:
-          data = json.load(f)
-          await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, data))
+        self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+        filter_data = self.cursor.fetchall()
+        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
     
     except discord.NotFound:
         return  

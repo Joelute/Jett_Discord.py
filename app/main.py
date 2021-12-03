@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from discord.ext.commands import cooldown
 from discord.ext.commands import BucketType
-from keep_alive import keep_alive
 from itertools import cycle
 from discord_components import DiscordComponents, ComponentsBot, Button
+import database
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -20,7 +20,7 @@ RIOT_KEYT = os.getenv("riot_key")
 intents = discord.Intents.default()
 intents.members = True
 
-client = commands.Bot(case_insensitive = True, command_prefix='/', intents = intents)
+client = commands.Bot(case_insensitive = True, command_prefix='s!', intents = intents)
 DiscordComponents(client)
 client.remove_command('help')
 
@@ -227,6 +227,5 @@ for filename in os.listdir('./app/cogs'):
 async def change_status():
   await client.change_presence(activity= discord.Game(next(status)))
 
-keep_alive()
 client.run(TOKEN)
 
