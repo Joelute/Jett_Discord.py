@@ -20,7 +20,7 @@ RIOT_KEYT = os.getenv("riot_key")
 intents = discord.Intents.default()
 intents.members = True
 
-client = commands.Bot(case_insensitive = True, command_prefix='s!', intents = intents)
+client = commands.Bot(case_insensitive = True, command_prefix='/', intents = intents)
 DiscordComponents(client)
 client.remove_command('help')
 
