@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 
 
-class profile(commands.Cog):
+class Profile(commands.Cog):
 
   def __init__(self, client):
     self.client = client
@@ -23,4 +23,4 @@ class profile(commands.Cog):
   
 
 def setup(client):
-  client.add_cog(profile(client))
+  client.add_cog(Profile(client))

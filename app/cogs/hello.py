@@ -10,18 +10,14 @@ class Hello(commands.Cog):
     self.client = client
 
 
-  #@commands.Cog.listener()
-  #async def on_ready(self):
-  #  print("Hello!")
+  @commands.Cog.listener()
+  async def on_ready(self):
+    print("Hello!")
 
   @commands.Cog.listener()
   async def on_member_join(self, member):
     await member.create_dm()
     await member.dm_channel.send(f"Hey, {member.mention}! Welcome to our Discord server!")
-    """
-    role = discord.utils.get(member.guild.roles, name = "Get Started")
-    await member.add_roles(role)
-    """
   @commands.Cog.listener()
   async def on_command_error(self, ctx, exc):
     if isinstance(exc, CommandNotFound):
