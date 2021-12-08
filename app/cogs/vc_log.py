@@ -7,10 +7,11 @@ from datetime import datetime
 import discord_components
 from discord_components import Button, ButtonStyle
 import database
+import psycopg2
 # Pepega Coding Adventure: Volume 1
 
 
-class vc_log(commands.Cog):
+class Vc_log(commands.Cog):
 
 
   def __init__(self, bot):
@@ -18,12 +19,14 @@ class vc_log(commands.Cog):
 
     self.board = {}
      
-    self.cursor, self.conn = database.get_cursor()
+    self.conn = database.get_conn()
+
+    self.cursor = self.conn.cursor()
 
   @commands.command(name="vclog")
   async def vclog(self, ctx):
       
-      self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(ctx.guild.id),))
+      self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
       
       filter_data = self.cursor.fetchall()
       
@@ -132,16 +135,14 @@ class vc_log(commands.Cog):
     else:
       return
 
-    #Possible ERROR: CURRENT TRANSACTION IS ABORTED, COMMANDS IGNORED UNTIL END OF TRANSACTION BLOCK
+    # Possible ERROR: CURRENT TRANSACTION IS ABORTED, COMMANDS IGNORED UNTIL END OF TRANSACTION BLOCK
     try:
-      self.cursor.execute("""INSERT INTO vclog (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s) RETURNING *""", (time, member.id, channel_name, action, server))
-      context = self.cursor.fetchone()
-      self.conn.commit()   
-    except:
-      self.cursor.execute("""rollback;""")
-      print("An Error has occured")
-    
+      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
+      self.conn.commit()  
 
+    except Exception as e:
+      self.cursor.execute("""rollback;""")
+      
 
   @commands.Cog.listener(name='on_button_click')
   async def on_button_click(self, interaction):
@@ -154,7 +155,7 @@ class vc_log(commands.Cog):
           return
     
         self.board[interaction.user.id]["Page"] -= 1
-        self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
         filter_data = self.cursor.fetchall()
         await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
 
@@ -163,7 +164,7 @@ class vc_log(commands.Cog):
           return
     
         self.board[interaction.user.id]["Page"] += 1
-        self.cursor.execute("""SELECT * FROM vclog WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
         filter_data = self.cursor.fetchall()
         await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
     
@@ -171,4 +172,4 @@ class vc_log(commands.Cog):
         return  
 
 def setup(bot):
-  bot.add_cog(vc_log(bot))
+  bot.add_cog(Vc_log(bot))

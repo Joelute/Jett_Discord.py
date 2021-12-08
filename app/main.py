@@ -1,21 +1,17 @@
 import discord
 import os
-import requests
-import aiohttp  
-import json
-import random
 from datetime import datetime
+from pytz import timezone
 from dotenv import load_dotenv
 from discord.ext import commands, tasks
-from discord.ext.commands import cooldown
-from discord.ext.commands import BucketType
 from itertools import cycle
-from discord_components import DiscordComponents, ComponentsBot, Button
+from discord_components import DiscordComponents
 import database
+import psycopg2
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
-RIOT_KEYT = os.getenv("riot_key")
+RIOT_KEY = os.getenv("riot_key")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -33,31 +29,8 @@ status = cycle(["VALORANT", "Watch this!"])
 @client.event
 async def on_ready():
   change_status.start()
-  print("Hello!")
+  database_conn.start()
   
-
-@client.command(name = "setting", aliases = ["settings"])
-@commands.has_guild_permissions(manage_guild = True)
-async def setting(ctx):
-
-    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"]
-    embed = discord.Embed(
-      title = "Server Settings for Jett",
-      description = "Tweak the settings for Jett",
-      colour = discord.Colour.greyple(),
-      timestamp = datetime.utcnow()
-    )
-
-    embed.add_field(name = "1️⃣ Placeholder", value = "Placeholder WORK IN PROGRESS", inline = True)
-
-    global editableText
-    editableText = await ctx.send(embed = embed)
-    for emoji in emojis:
-      await editableText.add_reaction(emoji)
-
-
-#--------------------------------------------------------------------------------------
-
 
 @client.command(name = "help")
 async def help(ctx):
@@ -83,61 +56,6 @@ async def help(ctx):
   embed.add_field(name = "Random Anime Quote", value = "Get a random Anime quote and have it read aloud by Discord.`/quote`", inline = True)
 
   await ctx.send(embed=embed)
-
-
-
-#--------------------------------------------------------------------------------------
-
-
-@client.command(name= "stw")
-async def stw(ctx):
-  await ctx.send("https://stw-planner.com/mission-alerts/v-buck-missions")
-
-
-#--------------------------------------------------------------------------------------
-
-
-@client.command(name="Jett")
-async def AddJett(ctx):
-  await ctx.send("Like the Jett bot? Get it in your server now! http://bit.ly/JettDiscord")
-
-
-#--------------------------------------------------------------------------------------
-
-
-@client.command(name="animeq")
-async def get_anime_quote(ctx):
-  response = requests.get("https://animechan.vercel.app/api/random")
-  json_data = json.loads(response.text)
-  quote = str(json_data["quote"]) + " -" + str(json_data["character"]) + " from " + str(json_data["anime"])
-  await ctx.send(quote)
-
-
-#--------------------------------------------------------------------------------------
-
-
-@client.command(name="quote")
-async def get_quote(ctx):
-  response = requests.get("https://zenquotes.io/api/random")
-  json_data = json.loads(response.text)
-  quote = json_data[0] ["q"] + " -" + json_data[0] ["a"]
-  await ctx.send(quote)
-
-
-#--------------------------------------------------------------------------------------
-
-
-@client.command(name="roll")
-async def roll(ctx, number_of_side: int):
-  dice = str(random.choice(range(1, number_of_side + 1)))
-  dices = await ctx.send(f"You rolled a {dice}! 🎲")
-  await dices.add_reaction("🎲")
-
-  def check(reaction,user):
-    return user == ctx.author and str(reaction.emoji) in ("🎲")
-  reaction, user = await client.wait_for("reaction_add", timeout = 30.0 , check = check)
-
-  await roll(ctx, number_of_side)
 
 
 #--------------------------------------------------------------------------------------
@@ -223,9 +141,20 @@ for filename in os.listdir('./app/cogs'):
   if filename.endswith('.py'):
     client.load_extension(f'cogs.{filename[:-3]}')
 
-@tasks.loop(hours = 1)
+@tasks.loop(minutes = 10)
 async def change_status():
   await client.change_presence(activity= discord.Game(next(status)))
+
+@tasks.loop(minutes = 4)
+async def database_conn():
+  try:
+    conn = database.get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" """)
+    print("Connection Stable " + str(datetime.now(timezone("EST"))))
+  except psycopg2.InterfaceError:
+    database.retry_connection()
+
 
 client.run(TOKEN)
 

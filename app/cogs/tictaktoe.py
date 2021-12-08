@@ -3,7 +3,7 @@ from discord.ext import commands
 import discord_components
 from discord_components import Button, ButtonStyle
 
-class tictactoe(commands.Cog):
+class Tictactoe(commands.Cog):
 
   def __init__(self, client):
     self.client = client
@@ -174,7 +174,7 @@ class tictactoe(commands.Cog):
       return
   
 def setup(client):
-  client.add_cog(tictactoe(client))
+  client.add_cog(Tictactoe(client))
 
 
 

@@ -4,7 +4,7 @@ import random
 import discord_components
 from discord_components import Button, ButtonStyle
 
-class rps(commands.Cog):
+class Rps(commands.Cog):
 
   def __init__(self, client):
     self.client = client
@@ -145,4 +145,4 @@ class rps(commands.Cog):
         return  
 
 def setup(client):
-  client.add_cog(rps(client))
+  client.add_cog(Rps(client))
