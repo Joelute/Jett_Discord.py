@@ -6,7 +6,7 @@ import math
 from datetime import datetime
 import discord_components
 from discord_components import Button, ButtonStyle
-import database
+from database import database
 import psycopg2
 # Pepega Coding Adventure: Volume 1
 
@@ -139,6 +139,14 @@ class Vc_log(commands.Cog):
     try:
       self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
       self.conn.commit()  
+
+    except psycopg2.InterfaceError:
+      print("Connection to Database has been closed.\nAttempting to re-connect.")
+      conn = database.try_connection()
+      database.set_conn(conn)
+      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
+      self.conn.commit()
+      print("Recorded Activity")  
 
     except Exception as e:
       self.cursor.execute("""rollback;""")
