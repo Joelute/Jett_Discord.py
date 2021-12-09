@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from itertools import cycle
 from discord_components import DiscordComponents
-import database
+from database import database
 import psycopg2
 
 load_dotenv()
@@ -152,8 +152,10 @@ async def database_conn():
     cursor = conn.cursor()
     cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" """)
     print("Connection Stable " + str(datetime.now(timezone("EST"))))
-  except psycopg2.InterfaceError:
-    database.retry_connection()
+  except psycopg2.OperationalError:
+    print("Connection to Database has been closed.\nAttempting to re-connect.")
+    conn = database.try_connection()
+    database.set_conn(conn)
 
 
 client.run(TOKEN)
