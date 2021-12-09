@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import json
 import os
 import math
@@ -21,8 +21,10 @@ class Vc_log(commands.Cog):
      
     self.conn = database.get_conn()
 
-    self.cursor = self.conn.cursor()
+    self.cursor = database.get_cursor()
 
+    self.update_cursor.start()
+    
   @commands.command(name="vclog")
   async def vclog(self, ctx):
       
@@ -141,9 +143,11 @@ class Vc_log(commands.Cog):
       self.conn.commit()  
 
     except psycopg2.InterfaceError:
-      print("Connection to Database has been closed.\nAttempting to re-connect.")
-      conn = database.try_connection()
-      database.set_conn(conn)
+      print("Connection to Database has been closed.\nAttempting to re-connect...")
+      cursor, conn = database.try_connection()
+      database.set_conn(cursor, conn)
+      self.cursor = cursor
+      self.conn = conn
       self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
       self.conn.commit()
       print("Recorded Activity")  
@@ -178,6 +182,11 @@ class Vc_log(commands.Cog):
     
     except discord.NotFound:
         return  
+  
+  @tasks.loop(minutes = 1)
+  async def update_cursor(self):
+    self.cursor = database.get_cursor()
+    self.conn = database.get_conn()
 
 def setup(bot):
   bot.add_cog(Vc_log(bot))

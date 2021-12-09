@@ -153,9 +153,9 @@ async def database_conn():
     cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" """)
     print("Connection Stable " + str(datetime.now(timezone("EST"))))
   except psycopg2.OperationalError:
-    print("Connection to Database has been closed.\nAttempting to re-connect.")
-    conn = database.try_connection()
-    database.set_conn(conn)
+    print("Connection to Database has been closed.\nAttempting to re-connect...")
+    cursor, conn = database.try_connection()
+    database.set_conn(cursor, conn)
 
 
 client.run(TOKEN)

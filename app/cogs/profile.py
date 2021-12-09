@@ -9,7 +9,6 @@ class Profile(commands.Cog):
 
   @commands.command(name = "av")
   async def getpfp(self, ctx, user: discord.User = None):
-    print(user)
     if user == None:
       user = ctx.author
     else:
