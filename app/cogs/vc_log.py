@@ -27,11 +27,21 @@ class Vc_log(commands.Cog):
     
   @commands.command(name="vclog")
   async def vclog(self, ctx):
+      try:
+        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
       
-      self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
+        filter_data = self.cursor.fetchall()
       
-      filter_data = self.cursor.fetchall()
-      
+      except psycopg2.OperationalError:
+
+        print("Connection to Database has been closed.\nAttempting to re-connect...")
+        cursor, conn = database.try_connection()
+        database.set_conn(cursor, conn)
+        self.cursor = cursor
+        self.conn = conn
+        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
+        filter_data = self.cursor.fetchall()
+
       pages = math.ceil(len(filter_data)/10)
 
       if pages > 0:
@@ -167,21 +177,32 @@ class Vc_log(commands.Cog):
           return
     
         self.board[interaction.user.id]["Page"] -= 1
-        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
-        filter_data = self.cursor.fetchall()
-        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
 
       elif interaction.component.id == 'down':
         if self.board[interaction.user.id]["Page"] >= self.board[interaction.user.id]["Pages"]:
           return
     
         self.board[interaction.user.id]["Page"] += 1
+
+      else:
+        return
+
+      try:
         self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
         filter_data = self.cursor.fetchall()
         await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
-    
+
+      except psycopg2.OperationalError:
+        print("Connection to Database has been closed.\nAttempting to re-connect...")
+        cursor, conn = database.try_connection()
+        database.set_conn(cursor, conn)
+        self.cursor = cursor
+        self.conn = conn
+        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+        filter_data = self.cursor.fetchall()
+        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
     except discord.NotFound:
-        return  
+      return
   
   @tasks.loop(minutes = 1)
   async def update_cursor(self):
