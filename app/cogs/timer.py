@@ -1,8 +1,9 @@
 import discord
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from discord.ext import commands
 from discord_components import Button, ButtonStyle
+import math
 
 
 
@@ -12,11 +13,13 @@ class timer(commands.Cog):
         self.client = client
 
         self.sessions = {}
+
+        self.timer_lists = {}
  
 
     @commands.command(name = "timer")
     async def timer(self, ctx):
-        self.sessions[ctx.author.id] = {"message": None, "hours": None, "minutes":None, "seconds":None, "name":None, "page":0}
+        self.sessions[ctx.author.id] = {"message": None, "hours": None, "minutes":None, "seconds":None, "name":None, "ring_time":None, "page":0}
         self.sessions[ctx.author.id]["message"] = await ctx.send(embed = await self.timer_embed(ctx.author.id), components = 
             [[
             Button(style = ButtonStyle.blue, label = "▶", custom_id="next"),
@@ -81,6 +84,8 @@ class timer(commands.Cog):
             embed.add_field(name = "Minute", value= user["minutes"], inline=True)
             embed.add_field(name = "Second", value= user["seconds"], inline=True)
             embed.add_field(name = "Name of Timer:", value = user["name"], inline = False)
+            ring_time = str(user["ring_time"])
+            embed.add_field(name = "Pings at: ", value= f"<t:{ring_time}>")
             return embed
 
         elif user["page"] == 5:
@@ -95,6 +100,8 @@ class timer(commands.Cog):
             embed.add_field(name = "Minute", value= user["minutes"], inline=True)
             embed.add_field(name = "Second", value= user["seconds"], inline=True)
             embed.add_field(name = "Name of Timer:", value = user["name"], inline = False)
+            ring_time = str(user["ring_time"])
+            embed.add_field(name = "Pings at: ", value= f"<t:{ring_time}>", inline = False)
             return embed
 
         elif user["page"] == 400:
@@ -164,6 +171,7 @@ class timer(commands.Cog):
                     ]]
                 elif user["page"] == 3:
                     user["name"] = "Timer"
+                    user["ring_time"] = math.floor(int((datetime.utcnow() + timedelta(hours = user["hours"], minutes = user["minutes"], seconds=user["seconds"])).timestamp()))
                     components = [[
                         Button(style = ButtonStyle.blue, label = "◀", custom_id = "back"),
                         Button(style = ButtonStyle.blue, label = "✅", custom_id="finish"),
@@ -291,7 +299,7 @@ class timer(commands.Cog):
                         Button(style = ButtonStyle.blue, label = "❌", custom_id = "quit")
                     ]]
                     user["name"] = str(ctx.content)
-                
+                    user["ring_time"] = math.floor(int((datetime.utcnow() + timedelta(hours = user["hours"], minutes = user["minutes"], seconds=user["seconds"])).timestamp()))                
                 else:
                     return
 
