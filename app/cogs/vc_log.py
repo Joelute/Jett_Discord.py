@@ -162,6 +162,16 @@ class Vc_log(commands.Cog):
       self.conn.commit()
       print("Recorded Activity")  
 
+    except psycopg2.OperationalError:
+      print("Connection to Database has been closed.\nAttempting to re-connect...")
+      cursor, conn = database.try_connection()
+      database.set_conn(cursor, conn)
+      self.cursor = cursor
+      self.conn = conn
+      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
+      self.conn.commit()
+      print("Recorded Activity")
+
     except Exception as e:
       self.cursor.execute("""rollback;""")
       
