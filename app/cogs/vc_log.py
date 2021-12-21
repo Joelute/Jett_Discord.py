@@ -1,10 +1,8 @@
 import discord
 from discord.ext import commands, tasks
-import json
-import os
+from discord.ext.commands import cooldown, BucketType
 import math
 from datetime import datetime
-import discord_components
 from discord_components import Button, ButtonStyle
 from database import database
 import psycopg2
@@ -26,35 +24,24 @@ class Vc_log(commands.Cog):
     self.update_cursor.start()
     
   @commands.command(name="vclog")
+  @cooldown(1, 10, BucketType.user)
   async def vclog(self, ctx):
-      try:
-        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
       
-        filter_data = self.cursor.fetchall()
-      
-      except psycopg2.OperationalError:
+    filter_data = await self.try_select_all("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
 
-        print("Connection to Database has been closed.\nAttempting to re-connect...")
-        cursor, conn = database.try_connection()
-        database.set_conn(cursor, conn)
-        self.cursor = cursor
-        self.conn = conn
-        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(ctx.guild.id),))
-        filter_data = self.cursor.fetchall()
+    pages = math.ceil(len(filter_data)/10)
 
-      pages = math.ceil(len(filter_data)/10)
-
-      if pages > 0:
-        pages -= 1
+    if pages > 0:
+      pages -= 1
+    
+    self.board[ctx.author.id] = {"Message": None, "Page": 0, "Pages": pages, "server": ctx.guild.id}
+    
+    self.board[ctx.author.id]["Message"] = await ctx.send(embed=await self.board_embed(ctx.author, filter_data), components = 
+      [[
+        Button(style = ButtonStyle.blue, label = "⬆", custom_id="up"),
+        Button(style = ButtonStyle.blue, label = "⬇", custom_id = "down"), 
       
-      self.board[ctx.author.id] = {"Message": None, "Page": 0, "Pages": pages, "server": ctx.guild.id}
-      
-      self.board[ctx.author.id]["Message"] = await ctx.send(embed=await self.board_embed(ctx.author, filter_data), components = 
-    [[
-      Button(style = ButtonStyle.blue, label = "⬆", custom_id="up"),
-      Button(style = ButtonStyle.blue, label = "⬇", custom_id = "down"), 
-      
-    ]])
+      ]])
   
 
   async def board_embed(self, user, data):
@@ -148,33 +135,7 @@ class Vc_log(commands.Cog):
       return
 
     # Possible ERROR: CURRENT TRANSACTION IS ABORTED, COMMANDS IGNORED UNTIL END OF TRANSACTION BLOCK
-    try:
-      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
-      self.conn.commit()  
-
-    except psycopg2.InterfaceError:
-      print("Connection to Database has been closed.\nAttempting to re-connect...")
-      cursor, conn = database.try_connection()
-      database.set_conn(cursor, conn)
-      self.cursor = cursor
-      self.conn = conn
-      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
-      self.conn.commit()
-      print("Recorded Activity")  
-
-    except psycopg2.OperationalError:
-      print("Connection to Database has been closed.\nAttempting to re-connect...")
-      cursor, conn = database.try_connection()
-      database.set_conn(cursor, conn)
-      self.cursor = cursor
-      self.conn = conn
-      self.cursor.execute("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
-      self.conn.commit()
-      print("Recorded Activity")
-
-    except Exception as e:
-      self.cursor.execute("""rollback;""")
-      
+    await self.try_insert("""INSERT INTO "Joelute/Jett"."vclog" (timestamp, user_id, channel, action, server_id) VALUES (%s,%s,%s,%s,%s)""", (time, member.id, channel_name, action, server))
 
   @commands.Cog.listener(name='on_button_click')
   async def on_button_click(self, interaction):
@@ -196,21 +157,9 @@ class Vc_log(commands.Cog):
 
       else:
         return
+      filter_data = await self.try_select_all("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
+      await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
 
-      try:
-        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
-        filter_data = self.cursor.fetchall()
-        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
-
-      except psycopg2.OperationalError:
-        print("Connection to Database has been closed.\nAttempting to re-connect...")
-        cursor, conn = database.try_connection()
-        database.set_conn(cursor, conn)
-        self.cursor = cursor
-        self.conn = conn
-        self.cursor.execute("""SELECT * FROM "Joelute/Jett"."vclog" WHERE server_id = %s""", (str(self.board[interaction.user.id]["server"]),))
-        filter_data = self.cursor.fetchall()
-        await self.board[interaction.user.id]["Message"].edit(embed=await self.board_embed(interaction.user, filter_data))
     except discord.NotFound:
       return
   
@@ -218,6 +167,48 @@ class Vc_log(commands.Cog):
   async def update_cursor(self):
     self.cursor = database.get_cursor()
     self.conn = database.get_conn()
+
+  async def try_select_all(self, query, value):
+    try:
+        self.cursor.execute(query,value)
+        return self.cursor.fetchall()
+
+    except psycopg2.OperationalError:
+        print("Connection to Database has been closed.\nAttempting to re-connect...")
+        cursor, conn = database.try_connection()
+        database.set_conn(cursor, conn)
+        self.cursor = cursor
+        self.conn = conn
+        self.cursor.execute(query,value)
+        return self.cursor.fetchall()
+
+    except:
+        pass
+  
+  async def try_insert(self,query, value):
+    try:
+        self.cursor.execute(query,value)
+        self.conn.commit()
+    except psycopg2.OperationalError:
+        print("Connection to Database has been closed.\nAttempting to re-connect...")
+        cursor, conn = database.try_connection()
+        database.set_conn(cursor, conn)
+        self.cursor = cursor
+        self.conn = conn
+        self.cursor.execute(query,value)
+        self.conn.commit()
+
+    except psycopg2.InterfaceError:
+        print("Connection to Database has been closed.\nAttempting to re-connect...")
+        cursor, conn = database.try_connection()
+        database.set_conn(cursor, conn)
+        self.cursor = cursor
+        self.conn = conn
+        self.cursor.execute(query,value)
+        self.conn.commit()
+
+    except:
+        self.cursor.execute("""rollback;""")
 
 def setup(bot):
   bot.add_cog(Vc_log(bot))

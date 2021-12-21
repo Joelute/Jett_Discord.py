@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import discord_components
 from discord_components import Button, ButtonStyle
 
 class Tictactoe(commands.Cog):

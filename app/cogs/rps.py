@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import random
-import discord_components
 from discord_components import Button, ButtonStyle
 
 class Rps(commands.Cog):
