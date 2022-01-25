@@ -13,7 +13,7 @@ class Extra(commands.Cog):
 
   @commands.command(name= "stw")
   async def stw(self, ctx):
-    await ctx.send("https://stw-planner.com/mission-alerts/v-buck-missions")
+    await ctx.send("https://fortnitedb.com/")
 
 
 #--------------------------------------------------------------------------------------
